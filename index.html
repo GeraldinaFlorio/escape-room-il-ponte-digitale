@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Il Ponte Digitale - Escape Room</title>
+    <style>
+        :root {
+            --primary: #4CAF50;
+            --secondary: #2196F3;
+            --accent: #FFEB3B;
+            --bg: #f0fdf4;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+            padding: 20px;
+            z-index: 10;
+        }
+
+        .level-indicator {
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .question-box {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .options-container {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 50px;
+            position: relative;
+            height: 200px;
+        }
+
+        .option {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .flower {
+            font-size: 60px;
+            transition: transform 0.3s;
+            filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.1));
+        }
+
+        .option-text {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            background: rgba(255,255,255,0.8);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        #butterfly {
+            position: fixed;
+            font-size: 40px;
+            pointer-events: none;
+            z-index: 9999;
+            transition: transform 0.1s ease-out;
+            user-select: none;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: 0.3s;
+        }
+
+        .btn-hint { background: var(--accent); }
+        .btn-next { background: var(--primary); color: white; display: none; }
+
+        #hint-text {
+            margin-top: 10px;
+            font-style: italic;
+            color: #666;
+            min-height: 1.2em;
+        }
+
+        #feedback-message {
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-top: 15px;
+        }
+
+        /* Schermata Finale */
+        #final-screen {
+            display: none;
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .final-letter-box {
+            display: inline-block;
+            width: 40px;
+            height: 50px;
+            border-bottom: 3px solid var(--primary);
+            margin: 5px;
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        .space { width: 20px; border: none; }
+    </style>
+</head>
+<body>
+
+    <div id="butterfly">🦋</div>
+
+    <div id="game-container">
+        <div id="quiz-section">
+            <div class="level-indicator">Livello <span id="current-level-num">1</span> di 9</div>
+            <div class="question-box">
+                <h2 id="question-text">Caricamento...</h2>
+                <div id="hint-text"></div>
+            </div>
+
+            <div class="options-container">
+                <div class="option" onmouseenter="checkAnswer(true)">
+                    <div class="flower" id="flower-correct">🌸</div>
+                    <div class="option-text" id="text-correct"></div>
+                </div>
+                <div class="option" onmouseenter="checkAnswer(false)">
+                    <div class="flower" id="flower-wrong">🌻</div>
+                    <div class="option-text" id="text-wrong"></div>
+                </div>
+            </div>
+
+            <div id="controls">
+                <button class="btn btn-hint" onclick="showHint()">Aiuto / Suggerimento</button>
+                <div id="feedback-message"></div>
+                <button class="btn btn-next" id="btn-next" onclick="nextLevel()">AVANTI</button>
+            </div>
+        </div>
+
+        <div id="final-screen">
+            <h1>Complimenti! Hai completato il Ponte Digitale!</h1>
+            <p>Ecco la frase segreta composta con le lettere che hai trovato:</p>
+            <div id="phrase-container"></div>
+            <p style="margin-top: 30px;">Hai dimostrato di essere un vero esperto di inclusione!</p>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            {
+                q: "Qual è l'obiettivo principale quando utilizziamo l'agenda visiva con il nostro compagno?",
+                correct: "Aiutarlo a capire cosa succederà durante la giornata e ridurre la sua ansia.",
+                wrong: "Obbligarlo a finire tutti i compiti nel minor tempo possibile.",
+                hint: "Pensa a come ti sentiresti se non sapessi cosa succederà tra cinque minuti.",
+                letter: "A", pos: 4 // W L_A_ SCUOLA
+            },
+            {
+                q: "Se il tuo compagno usa un'immagine o un'icona sul tablet per indicare un oggetto, cosa sta cercando di fare?",
+                correct: "Sta comunicando un suo bisogno o una sua scelta in modo alternativo alla parola.",
+                wrong: "Sta giocando con i disegni perché si annoia.",
+                hint: "Ricorda che il comportamento e le immagini sono messaggi.",
+                letter: "A", pos: 10 // W LA SCUOL_A_
+            },
+            {
+                q: "Perché a volte ci spostiamo in palestra o in giardino per svolgere le attività?",
+                correct: "Perché quegli spazi hanno meno rumori e luci forti che possono dare fastidio al compagno.",
+                wrong: "Perché in classe non c'è abbastanza spazio per i banchi.",
+                hint: "Considera come l'ambiente circostante influenza la nostra capacità di concentrazione.",
+                letter: "L", pos: 3 // W _L_A SCUOLA
+            },
+            {
+                q: "Qual è il compito principale dei 'Compagni di Volo' durante il lavoro digitale?",
+                correct: "Supportare il compagno e registrare i suoi successi e le sue reazioni.",
+                wrong: "Sostituirsi al compagno e fare il lavoro al posto suo.",
+                hint: "Pensa alla differenza tra aiutare qualcuno a camminare e portarlo in braccio.",
+                letter: "L", pos: 9 // W LA SCUO_L_A
+            },
+            {
+                q: "Se il compagno mostra segni di disagio (come agitazione), cosa dovrebbe fare il Peer Tutor?",
+                correct: "Proporre proattivamente una pausa strutturata o l'uso di un mediatore.",
+                wrong: "Ignorare il comportamento e continuare l'attività come se nulla fosse.",
+                hint: "L'osservazione dei segnali non verbali è fondamentale per un intervento tempestivo.",
+                letter: "W", pos: 1 // _W_ LA SCUOLA
+            },
+            {
+                q: "A cosa serve il timer digitale che utilizziamo durante le lezioni?",
+                correct: "A rendere visibile il tempo che passa e preparare il compagno al cambio di attività.",
+                wrong: "A mettere fretta e creare una competizione a chi finisce prima.",
+                hint: "È uno strumento per rendere il tempo 'concreto' e visibile.",
+                letter: "U", pos: 7 // W LA SC_U_OLA
+            },
+            {
+                q: "Cosa si intende per 'Ponte Digitale' in questo progetto?",
+                correct: "Un modo per usare la tecnologia come linguaggio comune tra tutta la classe e il compagno.",
+                wrong: "Un sito internet dove scaricare videogiochi durante l'intervallo.",
+                hint: "Un ponte serve a collegare due rive che altrimenti resterebbero separate.",
+                letter: "O", pos: 8 // W LA SCU_O_LA
+            },
+            {
+                q: "Perché registriamo i tempi di attenzione e i successi sul diario digitale?",
+                correct: "Per raccogliere dati oggettivi che aiutino i professori a capire i reali progressi.",
+                wrong: "Per dare un voto cattivo al compagno se non sta attento.",
+                hint: "Pensa a come gli scienziati osservano un esperimento per capire se funziona.",
+                letter: "C", pos: 6 // W LA S_C_UOLA
+            },
+            {
+                q: "Secondo il progetto, l'inclusione è...",
+                correct: "Trasformare l'ambiente e il modo di stare insieme per accogliere tutti.",
+                wrong: "Solo un compito che riguarda l'insegnante di sostegno.",
+                hint: "Rifletti su chi sono gli attori coinvolti nel rendere la classe un posto accogliente.",
+                letter: "S", pos: 5 // W LA _S_CUOLA
+            }
+        ];
+
+        let currentLevel = 0;
+        let collectedLetters = [];
+        const butterfly = document.getElementById('butterfly');
+        const feedback = document.getElementById('feedback-message');
+        const nextBtn = document.getElementById('btn-next');
+
+        // Movimento farfalla
+        document.addEventListener('mousemove', (e) => {
+            butterfly.style.left = e.clientX + 'px';
+            butterfly.style.top = e.clientY + 'px';
+        });
+
+        function loadLevel() {
+            const data = questions[currentLevel];
+            document.getElementById('current-level-num').innerText = currentLevel + 1;
+            document.getElementById('question-text').innerText = data.q;
+            document.getElementById('text-correct').innerText = data.correct;
+            document.getElementById('text-wrong').innerText = data.wrong;
+            document.getElementById('hint-text').innerText = "";
+            feedback.innerText = "";
+            feedback.style.color = "black";
+            nextBtn.style.display = "none";
+            butterfly.style.display = "block";
+            
+            // Randomizza posizione fiori (destra o sinistra)
+            const container = document.querySelector('.options-container');
+            if (Math.random() > 0.5) {
+                container.style.flexDirection = "row-reverse";
+            } else {
+                container.style.flexDirection = "row";
+            }
+        }
+
+        function checkAnswer(isCorrect) {
+            if (nextBtn.style.display === "block") return; // Impedisce clic dopo risposta
+
+            if (isCorrect) {
+                feedback.innerText = "ESATTO! Hai trovato la lettera: " + questions[currentLevel].letter;
+                feedback.style.color = "green";
+                collectedLetters.push({
+                    char: questions[currentLevel].letter,
+                    pos: questions[currentLevel].pos
+                });
+                nextBtn.style.display = "block";
+            } else {
+                feedback.innerText = "SBAGLIATO! La farfalla è volata via!";
+                feedback.style.color = "red";
+                butterfly.style.transform = "translate(2000px, -2000px) rotate(45deg)";
+                setTimeout(() => {
+                    alert("Riprova! La farfalla sta tornando...");
+                    butterfly.style.transform = "none";
+                    loadLevel();
+                }, 1000);
+            }
+        }
+
+        function showHint() {
+            document.getElementById('hint-text').innerText = questions[currentLevel].hint;
+        }
+
+        function nextLevel() {
+            currentLevel++;
+            if (currentLevel < questions.length) {
+                loadLevel();
+            } else {
+                showFinalScreen();
+            }
+        }
+
+        function showFinalScreen() {
+            document.getElementById('quiz-section').style.display = "none";
+            const finalScreen = document.getElementById('final-screen');
+            finalScreen.style.display = "block";
+            butterfly.style.display = "none";
+
+            const container = document.getElementById('phrase-container');
+            // Frase: W (1) _ (2) L (3) A (4) _ (5) S (6) C (7) U (8) O (9) L (10) A (11)
+            // Mappa posizioni: W=1, L=3, A=4, S=6, C=7, U=8, O=9, L=10, A=11
+            const fullPhrase = [
+                {p: 1, c: 'W'}, {p: 2, c: ' '}, 
+                {p: 3, c: 'L'}, {p: 4, c: 'A'}, {p: 5, c: ' '}, 
+                {p: 6, c: 'S'}, {p: 7, c: 'C'}, {p: 8, c: 'U'}, {p: 9, c: 'O'}, {p: 10, c: 'L'}, {p: 11, c: 'A'}
+            ];
+
+            fullPhrase.forEach(item => {
+                const span = document.createElement('div');
+                if (item.c === ' ') {
+                    span.className = "final-letter-box space";
+                } else {
+                    span.className = "final-letter-box";
+                    span.innerText = item.c;
+                }
+                container.appendChild(span);
+            });
+        }
+
+        // Avvio
+        loadLevel();
+    </script>
+</body>
+</html>
